@@ -28,12 +28,14 @@ jobs:
     - name: Run unit tests
       run: |
         echo "=== Stage 1: Unit Tests ==="
+        export PYTHONPATH="${PYTHONPATH}:${PWD}"
         pytest tests/test_unit_hashing.py -v
     
     # Stage 2: Component Tests
     - name: Run component tests
       run: |
         echo "=== Stage 2: Component Tests ==="
+        export PYTHONPATH="${PYTHONPATH}:${PWD}"
         pytest tests/test_component_fs.py -v
     
     # Stage 3: Lint
