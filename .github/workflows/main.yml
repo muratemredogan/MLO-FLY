@@ -1,0 +1,57 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    # Stage 1: Unit Tests
+    - name: Run unit tests
+      run: |
+        echo "=== Stage 1: Unit Tests ==="
+        pytest tests/test_unit_hashing.py -v
+    
+    # Stage 2: Component Tests
+    - name: Run component tests
+      run: |
+        echo "=== Stage 2: Component Tests ==="
+        pytest tests/test_component_fs.py -v
+    
+    # Stage 3: Lint
+    - name: Run flake8 linter
+      run: |
+        echo "=== Stage 3: Lint ==="
+        flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    # Stage 4: Package (Docker Build)
+    - name: Build Docker image
+      run: |
+        echo "=== Stage 4: Package (Docker Build) ==="
+        docker build -t mlops-hw2:latest .
+    
+    # Stage 5: Smoke Test
+    - name: Run smoke test
+      run: |
+        echo "=== Stage 5: Smoke Test ==="
+        python scripts/smoke_test.py
+

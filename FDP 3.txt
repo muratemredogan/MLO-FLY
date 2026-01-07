@@ -1,0 +1,10 @@
+# Example: Export to ONNX 
+import torch.onnx 
+torch.onnx.export(model, dummy_input, "model.onnx") 
+
+# API endpoint example 
+@app.post("/predict") 
+def predict(request: PredictionRequest): 
+features = preprocess(request) 
+prediction = model.predict(features) 
+return {"delay_class": prediction} 

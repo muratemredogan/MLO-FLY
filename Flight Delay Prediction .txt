@@ -1,0 +1,26 @@
+import hashlib 
+ 
+def hash_airport_code(iata_code, num_buckets=100): 
+    """ 
+    Hash an IATA airport code to a bucket index. 
+     
+    Args: 
+        iata_code: String representing airport (e.g., 'JFK') 
+        num_buckets: Number of hash buckets 
+     
+    Returns: 
+        Bucket index (0 to num_buckets-1) 
+    """ 
+    # Convert to bytes and hash 
+    hash_object = hashlib.md5(iata_code.encode()) 
+    hash_int = int(hash_object.hexdigest(), 16) 
+     
+    # Map to bucket 
+    bucket = hash_int % num_buckets 
+    return bucket 
+ 
+# Example usage 
+airports = ['JFK', 'LAX', 'ORD', 'ATL', 'DFW'] 
+for airport in airports: 
+    bucket = hash_airport_code(airport, 100) 
+    print(f"{airport} -> Bucket {bucket}") 

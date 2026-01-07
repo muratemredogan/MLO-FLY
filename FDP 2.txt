@@ -1,0 +1,40 @@
+import tensorflow as tf 
+from tensorflow.keras import layers, Model 
+ 
+# Assume we have 347 unique airports 
+vocab_size = 347 
+embedding_dim = 32  # Chosen embedding dimension 
+ 
+# Create a simple neural network with embedding layer 
+class FlightDelayModel(Model): 
+    def __init__(self, vocab_size, embedding_dim): 
+        super(FlightDelayModel, self).__init__() 
+         
+        # Embedding layer for departure airport 
+        # Maps each airport (0-346) to dense vector of size embedding_dim 
+        self.airport_embedding = layers.Embedding( 
+            input_dim=vocab_size,      # 347 airports 
+            output_dim=embedding_dim,   # 32-dimensional vectors 
+            input_length=1, 
+            name='airport_embedding' 
+        ) 
+         
+        # Additional layers for prediction 
+        self.dense1 = layers.Dense(64, activation='relu') 
+        self.dense2 = layers.Dense(32, activation='relu') 
+        self.output_layer = layers.Dense(1)  # Predict delay 
+         
+    def call(self, inputs): 
+        # inputs: airport_id (integer 0-346) 
+        x = self.airport_embedding(inputs) 
+        x = layers.Flatten()(x) 
+        x = self.dense1(x) 
+        x = self.dense2(x) 
+        return self.output_layer(x) 
+ 
+# Usage 
+model = FlightDelayModel(vocab_size=347, embedding_dim=32) 
+ 
+# Airport codes need to be mapped to integers 
+airport_to_id = {'JFK': 0, 'LAX': 1, 'ORD': 2, ...} 
+# Then feed integer IDs to the model
