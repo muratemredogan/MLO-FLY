@@ -53,3 +53,11 @@ Thumbs.db
 test_api.py
 *.log
 
+# ML Models
+models/
+*.pkl
+
+# Large datasets
+Airlines.csv
+*.csv
+

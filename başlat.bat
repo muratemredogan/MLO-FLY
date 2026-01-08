@@ -111,6 +111,27 @@ if errorlevel 1 (
 echo ✓ Paketler kuruldu
 echo.
 
+REM Model kontrolü ve eğitimi
+echo [3.5/6] Model kontrol ediliyor...
+if not exist "models\model.pkl" (
+    echo Model bulunamadı, eğitiliyor...
+    if exist "Airlines.csv" (
+        call venv\Scripts\activate.bat
+        python train_model.py
+        if errorlevel 1 (
+            echo [UYARI] Model eğitimi başarısız, ancak devam ediliyor...
+        ) else (
+            echo ✓ Model eğitildi ve kaydedildi
+        )
+    ) else (
+        echo [UYARI] Airlines.csv bulunamadı, model eğitilemedi!
+        echo Model olmadan API çalışacak ama tahmin yapamayacak.
+    )
+) else (
+    echo ✓ Model mevcut
+)
+echo.
+
 REM Eski API sürecini durdur (varsa)
 echo [4/6] Eski API süreçleri temizleniyor...
 for /f "tokens=2" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') do (

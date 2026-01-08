@@ -191,14 +191,11 @@
 <body>
     <div class="container">
         <h1>✈️ Flight Delay Prediction</h1>
-        <p class="subtitle">Havaalanı kodunu girerek hash bucket değerini öğrenin</p>
-        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 0.9em;">
+        <p class="subtitle">Gerçek ML Modeli ile Uçuş Gecikmesi Tahmini</p>
+        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 0.9em;">
             <strong>ℹ️ Sistem Ne Yapıyor?</strong><br>
-            Bu sistem, havaalanı kodlarını (IATA) <strong>hash bucket</strong> değerlerine çevirir. 
-            Hash bucket, makine öğrenmesi modellerinde verileri gruplamak için kullanılan bir tekniktir.
-            <br><br>
-            <strong>Örnek:</strong> "IST" havaalanı kodu → Hash Bucket: 2<br>
-            <strong>Kullanım:</strong> Bu bucket değerleri, uçuş gecikmesi tahmin modellerinde özellik (feature) olarak kullanılır.
+            Bu sistem, <strong>gerçek makine öğrenmesi modeli</strong> kullanarak uçuş gecikmesi tahmini yapar.
+            Model, 500,000+ uçuş verisi ile eğitilmiştir ve havaalanı, havayolu, gün, saat gibi faktörleri analiz eder.
         </div>
         
         <div id="status" class="status offline">
@@ -207,24 +204,87 @@
         
         <form id="predictForm">
             <div class="form-group">
-                <label for="airport">Havaalanı Kodu (IATA):</label>
+                <label for="departure_airport">Kalkış Havaalanı (IATA):</label>
                 <input 
                     type="text" 
-                    id="airport" 
-                    name="airport" 
+                    id="departure_airport" 
+                    name="departure_airport" 
                     placeholder="Örn: JFK, LAX, IST"
                     maxlength="3"
                     required
                     style="text-transform: uppercase;"
                 >
+            </div>
+            
+            <div class="form-group">
+                <label for="arrival_airport">Varış Havaalanı (IATA):</label>
+                <input 
+                    type="text" 
+                    id="arrival_airport" 
+                    name="arrival_airport" 
+                    placeholder="Örn: LAX, SFO, ATL"
+                    maxlength="3"
+                    required
+                    style="text-transform: uppercase;"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="airline">Havayolu Şirketi (Opsiyonel):</label>
+                <input 
+                    type="text" 
+                    id="airline" 
+                    name="airline" 
+                    placeholder="Örn: AA, DL, UA, CO"
+                    maxlength="3"
+                    style="text-transform: uppercase;"
+                >
                 <div class="examples">
                     Örnekler: 
-                    <span onclick="setAirport('JFK')">JFK</span>
-                    <span onclick="setAirport('LAX')">LAX</span>
-                    <span onclick="setAirport('IST')">IST</span>
-                    <span onclick="setAirport('ATL')">ATL</span>
-                    <span onclick="setAirport('ORD')">ORD</span>
+                    <span onclick="setAirline('AA')">AA</span>
+                    <span onclick="setAirline('DL')">DL</span>
+                    <span onclick="setAirline('UA')">UA</span>
+                    <span onclick="setAirline('CO')">CO</span>
+                    <span onclick="setAirline('US')">US</span>
                 </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="day_of_week">Haftanın Günü:</label>
+                <select id="day_of_week" name="day_of_week" required>
+                    <option value="">Seçiniz...</option>
+                    <option value="1">Pazartesi</option>
+                    <option value="2">Salı</option>
+                    <option value="3">Çarşamba</option>
+                    <option value="4">Perşembe</option>
+                    <option value="5">Cuma</option>
+                    <option value="6">Cumartesi</option>
+                    <option value="7">Pazar</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="time">Kalkış Saati (Saat:Dakika):</label>
+                <input 
+                    type="time" 
+                    id="time" 
+                    name="time" 
+                    required
+                >
+                <small style="color: #666; display: block; margin-top: 5px;">Saat formatında girin (örn: 14:30)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="length">Uçuş Süresi (Dakika):</label>
+                <input 
+                    type="number" 
+                    id="length" 
+                    name="length" 
+                    placeholder="Örn: 180, 240, 300"
+                    min="1"
+                    max="1440"
+                    required
+                >
             </div>
             
             <button type="submit" id="submitBtn">Tahmin Et</button>
@@ -244,7 +304,6 @@
         const form = document.getElementById('predictForm');
         const resultDiv = document.getElementById('result');
         const submitBtn = document.getElementById('submitBtn');
-        const airportInput = document.getElementById('airport');
         
         // API durumunu kontrol et
         async function checkAPIStatus() {
@@ -271,30 +330,98 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const airport = airportInput.value.trim().toUpperCase();
+            const departure = document.getElementById('departure_airport').value.trim().toUpperCase();
+            const arrival = document.getElementById('arrival_airport').value.trim().toUpperCase();
+            const airline = document.getElementById('airline').value.trim().toUpperCase() || null;
+            const dayOfWeek = parseInt(document.getElementById('day_of_week').value);
+            const timeInput = document.getElementById('time').value;
+            const length = parseInt(document.getElementById('length').value);
             
-            if (!airport || airport.length !== 3) {
-                showResult('error', 'Hata', 'Lütfen geçerli bir 3 harfli havaalanı kodu girin (örn: JFK, LAX)');
+            // Validasyon
+            if (!departure || departure.length !== 3) {
+                showResult('error', 'Hata', 'Lütfen geçerli bir kalkış havaalanı kodu girin (örn: JFK, LAX)');
                 return;
             }
             
+            if (!arrival || arrival.length !== 3) {
+                showResult('error', 'Hata', 'Lütfen geçerli bir varış havaalanı kodu girin (örn: LAX, SFO)');
+                return;
+            }
+            
+            if (!dayOfWeek || dayOfWeek < 1 || dayOfWeek > 7) {
+                showResult('error', 'Hata', 'Lütfen haftanın gününü seçin');
+                return;
+            }
+            
+            if (!timeInput) {
+                showResult('error', 'Hata', 'Lütfen kalkış saatini girin');
+                return;
+            }
+            
+            if (!length || length < 1) {
+                showResult('error', 'Hata', 'Lütfen geçerli bir uçuş süresi girin (dakika)');
+                return;
+            }
+            
+            // Saati dakikaya çevir (HH:MM -> dakika)
+            const [hours, minutes] = timeInput.split(':').map(Number);
+            const timeInMinutes = hours * 60 + minutes;
+            
             submitBtn.disabled = true;
-            showResult('loading', 'İşleniyor...', `"${airport}" havaalanı için tahmin yapılıyor...`);
+            showResult('loading', 'İşleniyor...', 
+                `${departure} → ${arrival} uçuşu için ML modeli ile tahmin yapılıyor...`);
             
             try {
+                const requestBody = {
+                    departure_airport: departure,
+                    arrival_airport: arrival,
+                    day_of_week: dayOfWeek,
+                    time: timeInMinutes,
+                    length: length
+                };
+                
+                if (airline) {
+                    requestBody.airline = airline;
+                }
+                
                 const response = await fetch(`${API_URL}/predict`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ departure_airport: airport })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
                 
                 if (response.ok) {
-                    showResult('success', 'Başarılı!', 
-                        `Havaalanı: ${airport}<br>Hash Bucket: <strong>${data.bucket}</strong>`);
+                    const delayText = data.delay_prediction ? 
+                        '<span style="color: #dc3545; font-weight: bold;">GECİKME VAR</span>' : 
+                        '<span style="color: #28a745; font-weight: bold;">GECİKME YOK</span>';
+                    
+                    const probabilityColor = data.delay_probability > 0.6 ? '#dc3545' : 
+                                           data.delay_probability < 0.4 ? '#28a745' : '#ffc107';
+                    
+                    showResult('success', 'Tahmin Sonucu', 
+                        `<div style="text-align: left;">
+                            <p><strong>Durum:</strong> ${delayText}</p>
+                            <p><strong>Gecikme Olasılığı:</strong> 
+                                <span style="color: ${probabilityColor}; font-weight: bold; font-size: 1.2em;">
+                                    ${(data.delay_probability * 100).toFixed(1)}%
+                                </span>
+                            </p>
+                            <p><strong>Güvenilirlik:</strong> ${data.confidence}</p>
+                            <p><strong>Mesaj:</strong> ${data.message}</p>
+                            <hr style="margin: 15px 0; border: none; border-top: 1px solid #e0e0e0;">
+                            <p style="font-size: 0.9em; color: #666;">
+                                <strong>Uçuş Detayları:</strong><br>
+                                ${departure} → ${arrival} | 
+                                ${airline || 'Havayolu belirtilmedi'} | 
+                                Gün: ${dayOfWeek} | 
+                                Saat: ${timeInput} | 
+                                Süre: ${length} dk
+                            </p>
+                        </div>`);
                 } else {
                     showResult('error', 'Hata', data.detail || 'Bir hata oluştu');
                 }
@@ -309,12 +436,11 @@
         
         function showResult(type, title, message) {
             resultDiv.className = `result ${type}`;
-            resultDiv.innerHTML = `<h3>${title}</h3><p>${message}</p>`;
+            resultDiv.innerHTML = `<h3>${title}</h3><div>${message}</div>`;
         }
         
-        function setAirport(code) {
-            airportInput.value = code;
-            airportInput.focus();
+        function setAirline(code) {
+            document.getElementById('airline').value = code;
         }
         
         // Sayfa yüklendiğinde API durumunu kontrol et

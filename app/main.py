@@ -7,13 +7,46 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from app.feature_engineering import hash_airport_code
 import os
+import pickle
+import numpy as np
 from datetime import datetime
+from typing import Optional
 
 app = FastAPI(
     title="Flight Delay Prediction API",
-    description="MLOps Homework 2 - CI/CD Pipeline Demo",
-    version="1.0.0"
+    description="MLOps Homework 2 - CI/CD Pipeline Demo - Gerçek ML Modeli ile Uçuş Gecikmesi Tahmini",
+    version="2.0.0"
 )
+
+# Model ve özellikleri yükle
+MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "model.pkl")
+FEATURES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "model_features.pkl")
+
+model = None
+model_features = None
+
+def load_model():
+    """Modeli yükle."""
+    global model, model_features
+    try:
+        if os.path.exists(MODEL_PATH) and os.path.exists(FEATURES_PATH):
+            with open(MODEL_PATH, 'rb') as f:
+                model = pickle.load(f)
+            with open(FEATURES_PATH, 'rb') as f:
+                model_features = pickle.load(f)
+            return True
+        return False
+    except Exception as e:
+        print(f"Model yükleme hatası: {e}")
+        return False
+
+# Uygulama başlangıcında modeli yükle
+@app.on_event("startup")
+async def startup_event():
+    if load_model():
+        print("✓ ML Modeli başarıyla yüklendi!")
+    else:
+        print("⚠ Model dosyası bulunamadı. Lütfen train_model.py çalıştırın.")
 
 # CORS middleware ekle
 app.add_middleware(
@@ -27,12 +60,20 @@ app.add_middleware(
 
 class PredictionRequest(BaseModel):
     """Request model for /predict endpoint."""
-    departure_airport: str = Field(..., description="IATA airport code (e.g., 'JFK')")
+    departure_airport: str = Field(..., description="Kalkış havaalanı IATA kodu (e.g., 'JFK')")
+    arrival_airport: str = Field(..., description="Varış havaalanı IATA kodu (e.g., 'LAX')")
+    airline: Optional[str] = Field(None, description="Havayolu şirketi kodu (e.g., 'AA', 'DL')")
+    day_of_week: int = Field(..., description="Haftanın günü (1=Pazartesi, 7=Pazar)", ge=1, le=7)
+    time: int = Field(..., description="Kalkış saati (dakika cinsinden, 0-1439)", ge=0, le=1439)
+    length: int = Field(..., description="Uçuş süresi (dakika)", ge=1)
 
 
 class PredictionResponse(BaseModel):
     """Response model for /predict endpoint."""
-    bucket: int = Field(..., description="Hash bucket index (0 to 99)")
+    delay_prediction: bool = Field(..., description="Gecikme tahmini (True=Gecikme var, False=Gecikme yok)")
+    delay_probability: float = Field(..., description="Gecikme olasılığı (0.0-1.0)")
+    confidence: str = Field(..., description="Tahmin güvenilirliği (Yüksek/Orta/Düşük)")
+    message: str = Field(..., description="Tahmin açıklaması")
 
 
 class HealthResponse(BaseModel):
@@ -263,22 +304,83 @@ async def health_check(request: Request):
 @app.post("/predict", response_model=PredictionResponse, status_code=200)
 async def predict(request: PredictionRequest):
     """
-    Predict hash bucket for departure airport code.
+    Gerçek ML modeli ile uçuş gecikmesi tahmini yapar.
     
     Args:
-        request: PredictionRequest with departure_airport field
+        request: PredictionRequest with flight details
     
     Returns:
-        PredictionResponse with bucket index
+        PredictionResponse with delay prediction and probability
     
     Raises:
-        HTTPException: If airport code is invalid
+        HTTPException: If model not loaded or invalid input
     """
+    # Model yüklü mü kontrol et
+    if model is None or model_features is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model yüklenmedi. Lütfen train_model.py çalıştırarak modeli eğitin."
+        )
+    
     try:
-        bucket = hash_airport_code(request.departure_airport, num_buckets=100)
-        return {"bucket": bucket}
+        # Özellikleri hazırla
+        airport_from_bucket = hash_airport_code(request.departure_airport, num_buckets=100)
+        airport_to_bucket = hash_airport_code(request.arrival_airport, num_buckets=100)
+        
+        # Havayolu şirketi encode et
+        if request.airline:
+            airline_encoded = hash_airport_code(request.airline, num_buckets=50)
+        else:
+            # Varsayılan değer
+            airline_encoded = 0
+        
+        # Özellik vektörü oluştur (model_features sırasına göre)
+        features_dict = {
+            'DayOfWeek': request.day_of_week,
+            'Time': request.time,
+            'Length': request.length,
+            'AirportFrom_Bucket': airport_from_bucket,
+            'AirportTo_Bucket': airport_to_bucket,
+            'Airline_Encoded': airline_encoded
+        }
+        
+        # Model'in beklediği sıraya göre düzenle
+        feature_vector = np.array([[
+            features_dict[feature] for feature in model_features
+        ]])
+        
+        # Tahmin yap
+        prediction = model.predict(feature_vector)[0]
+        probability = model.predict_proba(feature_vector)[0]
+        
+        # Gecikme olasılığı (class 1 = gecikme var)
+        delay_prob = probability[1] if len(probability) > 1 else probability[0]
+        
+        # Güvenilirlik belirle
+        if delay_prob >= 0.7 or delay_prob <= 0.3:
+            confidence = "Yüksek"
+        elif delay_prob >= 0.6 or delay_prob <= 0.4:
+            confidence = "Orta"
+        else:
+            confidence = "Düşük"
+        
+        # Mesaj oluştur
+        if prediction == 1:
+            message = f"Uçuş gecikmesi bekleniyor. Olasılık: {delay_prob*100:.1f}%"
+        else:
+            message = f"Uçuş zamanında kalkması bekleniyor. Gecikme olasılığı: {delay_prob*100:.1f}%"
+        
+        return {
+            "delay_prediction": bool(prediction),
+            "delay_probability": float(delay_prob),
+            "confidence": confidence,
+            "message": message
+        }
+        
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Geçersiz havaalanı kodu: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Tahmin sırasında hata: {str(e)}")
 
 
 if __name__ == "__main__":
