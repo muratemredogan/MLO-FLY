@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Delay Prediction API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+            display: block;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+            display: block;
+        }
+        
+        .result.loading {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            color: #0c5460;
+            display: block;
+        }
+        
+        .result h3 {
+            margin-bottom: 10px;
+        }
+        
+        .result p {
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .links {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: 600;
+        }
+        
+        .links a:hover {
+            text-decoration: underline;
+        }
+        
+        .examples {
+            margin-top: 15px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .examples span {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .examples span:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✈️ Flight Delay Prediction</h1>
+        <p class="subtitle">Havaalanı kodunu girerek hash bucket değerini öğrenin</p>
+        
+        <div id="status" class="status offline">
+            API bağlantısı kontrol ediliyor...
+        </div>
+        
+        <form id="predictForm">
+            <div class="form-group">
+                <label for="airport">Havaalanı Kodu (IATA):</label>
+                <input 
+                    type="text" 
+                    id="airport" 
+                    name="airport" 
+                    placeholder="Örn: JFK, LAX, IST"
+                    maxlength="3"
+                    required
+                    style="text-transform: uppercase;"
+                >
+                <div class="examples">
+                    Örnekler: 
+                    <span onclick="setAirport('JFK')">JFK</span>
+                    <span onclick="setAirport('LAX')">LAX</span>
+                    <span onclick="setAirport('IST')">IST</span>
+                    <span onclick="setAirport('ATL')">ATL</span>
+                    <span onclick="setAirport('ORD')">ORD</span>
+                </div>
+            </div>
+            
+            <button type="submit" id="submitBtn">Tahmin Et</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+        
+        <div class="links">
+            <a href="http://localhost:8000/docs" target="_blank">📚 Swagger UI</a>
+            <a href="http://localhost:8000/health" target="_blank">❤️ Health Check</a>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const statusDiv = document.getElementById('status');
+        const form = document.getElementById('predictForm');
+        const resultDiv = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+        const airportInput = document.getElementById('airport');
+        
+        // API durumunu kontrol et
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`, { timeout: 2000 });
+                if (response.ok) {
+                    statusDiv.className = 'status online';
+                    statusDiv.textContent = '✓ API çalışıyor';
+                    return true;
+                }
+            } catch (error) {
+                statusDiv.className = 'status offline';
+                statusDiv.textContent = '✗ API bağlantısı yok - Lütfen API\'nin çalıştığından emin olun';
+                return false;
+            }
+        }
+        
+        // Form gönderimi
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const airport = airportInput.value.trim().toUpperCase();
+            
+            if (!airport || airport.length !== 3) {
+                showResult('error', 'Hata', 'Lütfen geçerli bir 3 harfli havaalanı kodu girin (örn: JFK, LAX)');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            showResult('loading', 'İşleniyor...', `"${airport}" havaalanı için tahmin yapılıyor...`);
+            
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ departure_airport: airport })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', 'Başarılı!', 
+                        `Havaalanı: ${airport}<br>Hash Bucket: <strong>${data.bucket}</strong>`);
+                } else {
+                    showResult('error', 'Hata', data.detail || 'Bir hata oluştu');
+                }
+            } catch (error) {
+                showResult('error', 'Bağlantı Hatası', 
+                    'API\'ye bağlanılamadı. Lütfen API\'nin çalıştığından emin olun.<br>' + 
+                    'Hata: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+        
+        function showResult(type, title, message) {
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = `<h3>${title}</h3><p>${message}</p>`;
+        }
+        
+        function setAirport(code) {
+            airportInput.value = code;
+            airportInput.focus();
+        }
+        
+        // Sayfa yüklendiğinde API durumunu kontrol et
+        checkAPIStatus();
+        setInterval(checkAPIStatus, 10000); // Her 10 saniyede bir kontrol et
+    </script>
+</body>
+</html>
