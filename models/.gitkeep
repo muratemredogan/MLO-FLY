@@ -1,0 +1,3 @@
+# Bu dosya models/ dizininin Git'te saklanmasını sağlar
+# Model dosyaları (.pkl) .gitignore tarafından ignore edilir
+# ancak dizin yapısı korunur

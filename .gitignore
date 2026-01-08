@@ -54,7 +54,8 @@ test_api.py
 *.log
 
 # ML Models
-models/
+models/*
+!models/.gitkeep
 *.pkl
 # Exception: Include trained model files for CI/CD
 !models/model.pkl
