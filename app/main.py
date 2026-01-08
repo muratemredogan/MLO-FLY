@@ -22,6 +22,12 @@ app = FastAPI(
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "model.pkl")
 FEATURES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "model_features.pkl")
 
+# Gecikme tahmini için eşik değeri
+# 0.5 = varsayılan (daha fazla gecikme tahmini)
+# 0.6 = dengeli (önerilen, class_weight='balanced' için)
+# 0.7 = daha az gecikme tahmini
+DELAY_THRESHOLD = 0.6
+
 model = None
 model_features = None
 
@@ -349,12 +355,16 @@ async def predict(request: PredictionRequest):
             features_dict[feature] for feature in model_features
         ]])
         
-        # Tahmin yap
-        prediction = model.predict(feature_vector)[0]
+        # Olasılık tahmini al
         probability = model.predict_proba(feature_vector)[0]
         
         # Gecikme olasılığı (class 1 = gecikme var)
         delay_prob = probability[1] if len(probability) > 1 else probability[0]
+        
+        # Eşik değerine göre tahmin yap
+        # DELAY_THRESHOLD yukarıda tanımlanmış (varsayılan: 0.6)
+        # Bu değer, class_weight='balanced' nedeniyle yüksek olan gecikme tahminlerini dengeler
+        prediction = 1 if delay_prob >= DELAY_THRESHOLD else 0
         
         # Güvenilirlik belirle
         if delay_prob >= 0.7 or delay_prob <= 0.3:
