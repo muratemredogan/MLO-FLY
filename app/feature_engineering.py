@@ -37,6 +37,8 @@ def hash_airport_code(iata_code: str, num_buckets: int = 100) -> int:
     
     # Map to bucket using modulo
     bucket = hash_int % num_buckets
+
+    def hash_airport_code(iata_code, num_buckets=100):
     
     return bucket
 
