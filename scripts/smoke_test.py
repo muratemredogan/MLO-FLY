@@ -5,9 +5,10 @@ This script:
 1. Builds Docker image
 2. Runs container
 3. Waits for health endpoint
-4. Sends POST /predict request
-5. Asserts HTTP 200 OK
-6. Cleans up container
+4. Tests /health endpoint
+5. Sends POST /predict request with full flight data
+6. Asserts HTTP 200 OK and validates prediction response
+7. Cleans up container
 """
 import subprocess
 import time
@@ -90,7 +91,14 @@ def main():
         
         # Step 5: Test /predict endpoint
         print("\n[5/5] Testing /predict endpoint...")
-        predict_data = {"departure_airport": "JFK"}
+        predict_data = {
+            "departure_airport": "JFK",
+            "arrival_airport": "LAX",
+            "airline": "AA",
+            "day_of_week": 1,
+            "time": 600,  # 10:00 AM in minutes
+            "length": 360  # 6 hours in minutes
+        }
         response = requests.post(
             f"{base_url}/predict",
             json=predict_data,
@@ -100,10 +108,13 @@ def main():
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         result = response.json()
-        assert "bucket" in result, "Response should contain 'bucket' field"
-        assert isinstance(result["bucket"], int), "Bucket should be integer"
-        assert 0 <= result["bucket"] < 100, f"Bucket {result['bucket']} out of range"
-        print(f"✓ Predict endpoint working (JFK -> bucket {result['bucket']})")
+        assert "delay_prediction" in result, "Response should contain 'delay_prediction' field"
+        assert "delay_probability" in result, "Response should contain 'delay_probability' field"
+        assert "confidence" in result, "Response should contain 'confidence' field"
+        assert "message" in result, "Response should contain 'message' field"
+        assert isinstance(result["delay_prediction"], bool), "delay_prediction should be boolean"
+        assert 0.0 <= result["delay_probability"] <= 1.0, "delay_probability should be between 0 and 1"
+        print(f"✓ Predict endpoint working (JFK->LAX: delay={result['delay_prediction']}, prob={result['delay_probability']:.2f})")
         
         print("\n" + "=" * 60)
         print("✓ ALL TESTS PASSED - Smoke test successful!")
