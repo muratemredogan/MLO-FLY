@@ -5,25 +5,99 @@ echo   Flight Delay Prediction API Başlatılıyor
 echo ========================================
 echo.
 
-REM Python kontrolü
+REM Python kontrolü - hem python hem py komutlarını dene
 echo [1/6] Python kontrol ediliyor...
+set PYTHON_CMD=
+set PYTHON_FOUND=0
+
+REM Önce python komutunu dene
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo [HATA] Python bulunamadı! Lütfen Python'u yükleyin.
+if not errorlevel 1 (
+    set PYTHON_CMD=python
+    set PYTHON_FOUND=1
+    python --version
+    echo ✓ Python bulundu (python komutu ile)
+) else (
+    REM py launcher'ı dene
+    py --version >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=py
+        set PYTHON_FOUND=1
+        py --version
+        echo ✓ Python bulundu (py komutu ile)
+    )
+)
+
+REM Python bulunamadıysa hata ver
+if "%PYTHON_FOUND%"=="0" (
+    echo [HATA] Python bulunamadı!
+    echo.
+    echo Python yüklü görünüyor ama komut satırından erişilemiyor.
+    echo.
+    echo Çözüm önerileri:
+    echo 1. Python'u yeniden yükleyin ve "Add Python to PATH" seçeneğini işaretleyin
+    echo 2. Veya manuel olarak PATH'e ekleyin
+    echo 3. Veya py launcher kullanın: py --version
+    echo.
+    echo Şu anda çalışan komutları test edin:
+    python --version
+    py --version
+    echo.
     pause
     exit /b 1
 )
-python --version
-echo ✓ Python bulundu
+
+REM PYTHON_CMD'in set edildiğini kontrol et
+if "%PYTHON_CMD%"=="" (
+    echo [HATA] Python komutu belirlenemedi!
+    pause
+    exit /b 1
+)
 echo.
 
 REM Bağımlılıkları kontrol et ve kur
 echo [2/6] Bağımlılıklar kontrol ediliyor...
 if not exist "venv\" (
     echo Virtual environment oluşturuluyor...
-    python -m venv venv
+    echo Komut: %PYTHON_CMD% -m venv venv
+    %PYTHON_CMD% -m venv venv
+    if errorlevel 1 (
+        echo [HATA] Virtual environment oluşturulamadı!
+        echo.
+        echo Lütfen şunu manuel olarak deneyin:
+        echo %PYTHON_CMD% -m venv venv
+        echo.
+        pause
+        exit /b 1
+    )
+    echo ✓ Virtual environment oluşturuldu
+) else (
+    echo ✓ Virtual environment zaten mevcut
 )
+
+REM Virtual environment'ı aktifleştir
+if not exist "venv\Scripts\activate.bat" (
+    echo [HATA] Virtual environment düzgün oluşturulmamış!
+    echo venv klasörünü silip tekrar deneyin.
+    pause
+    exit /b 1
+)
+
 call venv\Scripts\activate.bat
+if errorlevel 1 (
+    echo [HATA] Virtual environment aktifleştirilemedi!
+    pause
+    exit /b 1
+)
+
+REM Venv içinde python'un çalıştığını kontrol et
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo [HATA] Virtual environment içinde Python bulunamadı!
+    echo venv klasörünü silip tekrar deneyin.
+    pause
+    exit /b 1
+)
 echo ✓ Virtual environment aktif
 echo.
 
@@ -57,6 +131,7 @@ echo [6/6] API'nin hazır olması bekleniyor...
 set /a counter=0
 :wait_loop
 timeout /t 2 /nobreak >nul
+call venv\Scripts\activate.bat
 python -c "import requests; requests.get('http://localhost:8000/health', timeout=2)" >nul 2>&1
 if errorlevel 1 (
     set /a counter+=1
@@ -78,6 +153,9 @@ echo ========================================
 echo.
 call venv\Scripts\activate.bat
 python test_api.py
+if errorlevel 1 (
+    echo [UYARI] Test sırasında bazı hatalar olabilir, ancak devam ediliyor...
+)
 echo.
 
 REM Web tarayıcısını aç
@@ -85,11 +163,10 @@ echo ========================================
 echo   Web Tarayıcısı Açılıyor
 echo ========================================
 echo.
-timeout /t 2 /nobreak >nul
-if exist "%~dp0index.html" (
-    start "" "%~dp0index.html"
-    echo ✓ Web arayüzü açıldı (index.html)
-)
+timeout /t 3 /nobreak >nul
+start http://localhost:8000
+echo ✓ Web arayüzü açıldı: http://localhost:8000
+timeout /t 1 /nobreak >nul
 start http://localhost:8000/docs
 echo ✓ Swagger UI: http://localhost:8000/docs
 echo ✓ API Health: http://localhost:8000/health
@@ -99,10 +176,11 @@ echo ========================================
 echo   Sistem Hazır!
 echo ========================================
 echo.
-echo API çalışıyor: http://localhost:8000
-echo Swagger UI: http://localhost:8000/docs
-echo Health Check: http://localhost:8000/health
+echo ✓ Web Arayüzü: http://localhost:8000
+echo ✓ Swagger UI: http://localhost:8000/docs
+echo ✓ Health Check: http://localhost:8000/health
 echo.
-echo API'yi durdurmak için bu pencereyi kapatın.
+echo NOT: API'yi durdurmak için bu pencereyi kapatın.
+echo      Veya arka planda çalışan "Flight Delay Prediction API" penceresini kapatın.
 echo.
 pause

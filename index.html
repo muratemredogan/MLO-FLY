@@ -192,6 +192,14 @@
     <div class="container">
         <h1>✈️ Flight Delay Prediction</h1>
         <p class="subtitle">Havaalanı kodunu girerek hash bucket değerini öğrenin</p>
+        <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 0.9em;">
+            <strong>ℹ️ Sistem Ne Yapıyor?</strong><br>
+            Bu sistem, havaalanı kodlarını (IATA) <strong>hash bucket</strong> değerlerine çevirir. 
+            Hash bucket, makine öğrenmesi modellerinde verileri gruplamak için kullanılan bir tekniktir.
+            <br><br>
+            <strong>Örnek:</strong> "IST" havaalanı kodu → Hash Bucket: 2<br>
+            <strong>Kullanım:</strong> Bu bucket değerleri, uçuş gecikmesi tahmin modellerinde özellik (feature) olarak kullanılır.
+        </div>
         
         <div id="status" class="status offline">
             API bağlantısı kontrol ediliyor...
@@ -241,7 +249,12 @@
         // API durumunu kontrol et
         async function checkAPIStatus() {
             try {
-                const response = await fetch(`${API_URL}/health`, { timeout: 2000 });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                const response = await fetch(`${API_URL}/health`, { 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
                 if (response.ok) {
                     statusDiv.className = 'status online';
                     statusDiv.textContent = '✓ API çalışıyor';
