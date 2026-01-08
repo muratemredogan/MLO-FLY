@@ -56,6 +56,9 @@ test_api.py
 # ML Models
 models/
 *.pkl
+# Exception: Include trained model files for CI/CD
+!models/model.pkl
+!models/model_features.pkl
 
 # Large datasets
 Airlines.csv

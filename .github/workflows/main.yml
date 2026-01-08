@@ -45,6 +45,19 @@ jobs:
         flake8 app/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 app/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
+    # Stage 3.5: Train Model (if dataset available)
+    - name: Train ML Model
+      run: |
+        echo "=== Stage 3.5: Train ML Model ==="
+        export PYTHONPATH="${PYTHONPATH}:${PWD}"
+        if [ -f "Airlines.csv" ]; then
+          python train_model.py
+          echo "✓ Model trained successfully"
+        else
+          echo "⚠ Airlines.csv not found, skipping model training"
+          echo "⚠ Note: Model files must be present for /predict endpoint to work"
+        fi
+    
     # Stage 4: Package (Docker Build)
     - name: Build Docker image
       run: |
