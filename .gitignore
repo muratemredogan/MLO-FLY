@@ -54,12 +54,10 @@ test_api.py
 *.log
 
 # ML Models
+# Model dosyaları CI/CD pipeline'da train_model.py ile eğitilir, Git'e eklenmez
 models/*
 !models/.gitkeep
 *.pkl
-# Exception: Include trained model files for CI/CD
-!models/model.pkl
-!models/model_features.pkl
 
 # Large datasets
 Airlines.csv
